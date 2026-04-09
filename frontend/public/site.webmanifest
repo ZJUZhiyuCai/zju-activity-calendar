@@ -1,0 +1,17 @@
+{
+  "name": "浙大活动日历",
+  "short_name": "浙大活动日历",
+  "description": "面向浙大本科生的讲座与活动预览产品",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f3ec",
+  "theme_color": "#a62c2b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

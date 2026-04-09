@@ -1,0 +1,16 @@
+name: Docs issue
+description: 文档错误、缺失或过期
+title: "[docs] "
+labels:
+  - documentation
+body:
+  - type: textarea
+    id: doc_problem
+    attributes:
+      label: 文档问题
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: 建议修改

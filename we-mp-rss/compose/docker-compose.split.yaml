@@ -1,0 +1,121 @@
+services:
+  mysql:
+    image: docker.1ms.run/mysql:8.3.0
+    container_name: zju-activity-calendar-db
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+
+  redis:
+    image: docker.1ms.run/redis:7-alpine
+    container_name: zju-activity-calendar-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  singbox:
+    image: ghcr.io/sagernet/sing-box:latest
+    container_name: zju-activity-calendar-singbox
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      SINGBOX_INBOUND_PORT: 7890
+      SINGBOX_LOG_LEVEL: info
+    entrypoint:
+      - /bin/sh
+      - /etc/sing-box/run-singbox.sh
+    volumes:
+      - ./singbox/run-singbox.sh:/etc/sing-box/run-singbox.sh:ro
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: zju-activity-calendar-data:latest
+    container_name: zju-activity-calendar-api
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      START_MODE: api
+      DB: mysql+pymysql://rss_user:change-me-in-compose@mysql/we_mp_rss?charset=utf8mb4
+      REDIS_ENABLED: "True"
+      REDIS_URL: redis://redis:6379/0
+      PROXY_HTTP_URL: http://singbox:7890
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../data:/app/data
+      - ../static:/app/static
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      singbox:
+        condition: service_started
+
+  worker:
+    image: zju-activity-calendar-data:latest
+    container_name: zju-activity-calendar-worker
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      START_MODE: worker
+      DB: mysql+pymysql://rss_user:change-me-in-compose@mysql/we_mp_rss?charset=utf8mb4
+      REDIS_ENABLED: "True"
+      REDIS_URL: redis://redis:6379/0
+      PROXY_HTTP_URL: http://singbox:7890
+    volumes:
+      - ../data:/app/data
+      - ../static:/app/static
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      singbox:
+        condition: service_started
+
+  auth:
+    image: zju-activity-calendar-data:latest
+    container_name: zju-activity-calendar-auth
+    restart: unless-stopped
+    profiles: ["wechat"]
+    env_file:
+      - ../.env
+    environment:
+      START_MODE: auth
+      DB: mysql+pymysql://rss_user:change-me-in-compose@mysql/we_mp_rss?charset=utf8mb4
+      REDIS_ENABLED: "True"
+      REDIS_URL: redis://redis:6379/0
+      PROXY_HTTP_URL: http://singbox:7890
+    volumes:
+      - ../data:/app/data
+      - ../static:/app/static
+    depends_on:
+      mysql:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      singbox:
+        condition: service_started
+
+volumes:
+  db_data:
+  redis_data:

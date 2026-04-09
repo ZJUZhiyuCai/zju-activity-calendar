@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: zju-activity-calendar-data:sqlite
+    container_name: zju-activity-calendar-sqlite
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      START_MODE: api
+      DB: sqlite:///data/we_mp_rss.db
+    volumes:
+      - ../data:/app/data
+      - ../static:/app/static

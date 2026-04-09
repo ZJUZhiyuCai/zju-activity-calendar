@@ -1,0 +1,28 @@
+.DS_Store
+
+# Root env / local state
+.env
+.env.local
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Python caches
+**/__pycache__/
+**/*.pyc
+
+# Backend runtime state
+we-mp-rss/config.yaml
+we-mp-rss/data/
+we-mp-rss/.venv/
+we-mp-rss/docker_version.txt
+we-mp-rss/static/calendar/
+
+# Local sidecar repo not included in the first public release scope
+wexin-read-mcp/
+
+# Editor
+.idea/
+.vscode/
+.trae/

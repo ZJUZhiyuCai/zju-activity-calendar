@@ -1,0 +1,33 @@
+name: Deploy failure
+description: 部署或启动失败
+title: "[deploy] "
+labels:
+  - deploy
+  - bug
+body:
+  - type: input
+    id: env
+    attributes:
+      label: 部署环境
+      description: 例如 macOS / Ubuntu / Docker / Railway / 自建服务器
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: 执行命令
+      description: 把启动命令和相关环境变量写出来
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: 实际报错
+    validations:
+      required: true
+  - type: textarea
+    id: expectation
+    attributes:
+      label: 预期行为
+    validations:
+      required: true

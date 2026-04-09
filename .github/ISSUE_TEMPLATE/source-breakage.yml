@@ -1,0 +1,34 @@
+name: Source breakage
+description: 某个官网来源或公众号来源失效
+title: "[source] "
+labels:
+  - source
+  - bug
+body:
+  - type: input
+    id: source_id
+    attributes:
+      label: 来源 ID / 名称
+      description: 例如 library、undergraduate_school、某个公众号名
+    validations:
+      required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 现象
+      description: 写清楚是抓不到、日期错了、详情缺失还是接口报错
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据
+      description: 可附上 `/api/v1/wx/sys/source_status`、页面截图、报错信息、来源链接
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+    validations:
+      required: true
