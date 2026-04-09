@@ -306,7 +306,8 @@ class WxGather:
             # from core.queue import TaskQueue
             # TaskQueue.clear_queue()  # 已注释：避免微信认证失效时清空队列
             import os
-            if str(os.getenv('WE_RSS.AUTH',False))!="True" and cfg.get("server.send_code")=="True":
+            from core.runtime_flags import is_auth_refresh_enabled
+            if not is_auth_refresh_enabled() and cfg.get("server.send_code")=="True":
                 setStatus(False)
                 threading.Thread(target=send_wx_code,args=(f"公众号平台登录失效,请重新登录",)).start()
             # send_wx_code(f"公众号平台登录失效,请重新登录")

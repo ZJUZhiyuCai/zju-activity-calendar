@@ -24,6 +24,7 @@
 - `CONTRIBUTING.md`：本地开发、测试和 PR 约定
 - `RELEASING.md`：GitHub Release 与版本说明流程
 - `docs/GITHUB_PUSH_PREP.md`：首次公开推送到 GitHub 的边界与检查项
+- `docs/OPEN_SOURCE_ACCEPTANCE_REPORT.md`：当前开源 alpha 的验收结论、未签收项和发布建议
 - `docs/releases/`：GitHub Release 草稿与版本说明草案
 - `LICENSE`：仓库根许可证；当前仓库默认沿用现有 MIT 文本，若未来某个子目录采用不同许可证，必须在子目录内单独声明
 

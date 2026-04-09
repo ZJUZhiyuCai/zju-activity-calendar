@@ -21,6 +21,12 @@ def _should_start_auth_service() -> bool:
 def parse_runtime_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ZJU Activity Calendar runtime")
     parser.add_argument(
+        "-config",
+        "--config",
+        default=cfg.config_path,
+        help="运行配置文件路径",
+    )
+    parser.add_argument(
         "--mode",
         choices=["api", "worker", "auth", "all"],
         default=cfg.get("startup.mode", "api"),
@@ -51,7 +57,7 @@ def maybe_start_auth_service(*, force: bool = False) -> None:
     try:
         from driver.auth import start_auth_service
 
-        start_auth_service()
+        start_auth_service(force_schedule=force)
         print_info("已启动公众号授权服务")
     except Exception as exc:
         print_warning(f"公众号授权服务启动失败，继续按当前模式运行: {exc}")

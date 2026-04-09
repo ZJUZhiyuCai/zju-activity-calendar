@@ -1,5 +1,6 @@
 import threading
 from core.print import print_warning
+from core.runtime_flags import is_auth_refresh_enabled
 from driver.base import WX_InterFace
 import os
 import portalocker
@@ -15,10 +16,10 @@ def auth():
     thread = threading.Thread(target=run_auth)
     thread.start()
     thread.join()  # 可选：等待完成
-def start_auth_service():    
+def start_auth_service(*, force_schedule: bool = False):    
     from driver.wx_api import login_with_token
     login_with_token()
-    if str(os.getenv('WE_RSS.AUTH',False))=="True":
+    if is_auth_refresh_enabled(force=force_schedule):
         print_warning("启动授权定时任务")
         auth_task=TaskScheduler()
         auth_task.clear_all_jobs()
