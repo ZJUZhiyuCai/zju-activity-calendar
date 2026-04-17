@@ -12,6 +12,13 @@ from apis.zju_activity import router as zju_activity_router
 from core.config import API_BASE, VERSION, cfg
 from core.db import DB
 from core.runtime_bootstrap import ensure_admin_user
+from core.activity_scraper import scrape_and_persist, SCRAPE_INTERVAL_MINUTES
+from core.content_filler import fill_one_article
+from core.mp_sync_scheduler import (
+    sync_all_mps,
+    MP_SYNC_INTERVAL_MINUTES,
+)
+from core.task.task import TaskScheduler
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 STATIC_DIR = PROJECT_ROOT / "static"
@@ -49,10 +56,61 @@ app.add_middleware(
 )
 
 
+_scheduler = TaskScheduler()
+
+
 @app.on_event("startup")
 async def ensure_tables():
     DB.create_tables()
     ensure_admin_user(DB)
+
+    # 启动定时采集：首次立即执行，之后按间隔重复
+    import threading
+    threading.Thread(target=scrape_and_persist, daemon=True).start()
+
+    # 构造 cron 表达式：<60 分钟用分钟字段，>=60 分钟用小时字段
+    if SCRAPE_INTERVAL_MINUTES < 60:
+        cron_expr = f"*/{SCRAPE_INTERVAL_MINUTES} * * * *"
+    else:
+        hours = max(SCRAPE_INTERVAL_MINUTES // 60, 1)
+        cron_expr = f"0 */{hours} * * *"
+
+    _scheduler.add_cron_job(
+        func=scrape_and_persist,
+        cron_expr=cron_expr,
+        job_id="activity_scraper",
+        tag="活动定时采集",
+    )
+
+    # 添加文章内容补全任务：每分钟执行一次
+    _scheduler.add_cron_job(
+        func=fill_one_article,
+        cron_expr="* * * * *",  # 每分钟
+        job_id="content_filler",
+        tag="文章内容补全",
+    )
+
+    # 添加公众号自动同步任务
+    if MP_SYNC_INTERVAL_MINUTES < 60:
+        mp_sync_cron = f"*/{MP_SYNC_INTERVAL_MINUTES} * * * *"
+    else:
+        mp_sync_hours = max(MP_SYNC_INTERVAL_MINUTES // 60, 1)
+        mp_sync_cron = f"0 */{mp_sync_hours} * * *"
+
+    _scheduler.add_cron_job(
+        func=sync_all_mps,
+        cron_expr=mp_sync_cron,
+        job_id="mp_sync_scheduler",
+        tag="公众号自动同步",
+    )
+    print(f"[Startup] 公众号自动同步已启动，间隔: {MP_SYNC_INTERVAL_MINUTES}分钟")
+
+    _scheduler.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    _scheduler.shutdown(wait=False)
 
 
 @app.middleware("http")

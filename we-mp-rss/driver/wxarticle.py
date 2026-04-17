@@ -4,7 +4,7 @@ from .playwright_driver import PlaywrightController
 from typing import Dict
 from core.print import print_error,print_info,print_success,print_warning
 import time
-import core.wait as Wait
+from core.wait import Wait
 import base64
 import re
 from bs4 import BeautifulSoup

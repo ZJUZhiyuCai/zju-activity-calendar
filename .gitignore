@@ -8,6 +8,8 @@
 frontend/node_modules/
 frontend/dist/
 
+CLAUDE.md
+
 # Python caches
 **/__pycache__/
 **/*.pyc
@@ -15,9 +17,18 @@ frontend/dist/
 # Backend runtime state
 we-mp-rss/config.yaml
 we-mp-rss/data/
+we-mp-rss/logs/
 we-mp-rss/.venv/
+we-mp-rss/venv/
 we-mp-rss/docker_version.txt
 we-mp-rss/static/calendar/
+
+# 证书与授权文件（含私钥/token，绝不上传）
+*.lic
+*.key
+*.pem
+*.p12
+*.pfx
 
 # Local sidecar repo not included in the first public release scope
 wexin-read-mcp/
@@ -26,3 +37,8 @@ wexin-read-mcp/
 .idea/
 .vscode/
 .trae/
+
+# Claude Code 工作目录
+.claude/
+
+*.log

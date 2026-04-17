@@ -365,6 +365,12 @@
           "url": "http://www.marx.zju.edu.cn/",
           "priority": 4,
           "category": "人文社科"
+        },
+        {
+          "id": "ckc",
+          "name": "竺可桢学院",
+          "category": "核心",
+          "priority": 2
         }
       ]
     },
@@ -455,6 +461,12 @@
           "college_id": "cls",
           "priority": 3,
           "description": "生命学院信息"
+        },
+        {
+          "name": "浙大竺院人",
+          "college_id": "ckc",
+          "priority": 2,
+          "description": "竺可桢学院官方公众号"
         }
       ],
       "campus": [

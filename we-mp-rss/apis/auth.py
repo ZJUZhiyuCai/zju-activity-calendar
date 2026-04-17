@@ -20,7 +20,7 @@ from .base import ErrorCategory, categorized_error_response, error_response, suc
 router = APIRouter(prefix="/auth", tags=["认证"])
 
 
-def auth_success(data):
+def auth_success(data, ext_data=None):
     if not data:
         print("\n登录失败，请检查上述错误信息")
         return

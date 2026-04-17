@@ -27,8 +27,10 @@ export function buildStatusNotice({ tone = 'info', title, message, meta }) {
 
 export function summarizeSourceStatus(sourceStatus) {
   if (!sourceStatus) return null;
+  // 用 attempted_sources 作为分母，与 ok/error 统计口径一致（两者都按 channel 拆分计数）
+  const attempted = sourceStatus.attempted_sources || sourceStatus.total_sources || 0;
   return {
-    total: sourceStatus.total_sources || 0,
+    total: attempted,
     ok: sourceStatus.ok_sources || 0,
     error: sourceStatus.error_sources || 0,
     generatedAt: sourceStatus.generated_at || null,

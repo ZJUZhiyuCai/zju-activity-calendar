@@ -77,7 +77,6 @@ function App() {
           api.getActivities({
             page: 1,
             limit: 500,
-            start_date: dayjs().startOf('month').format('YYYY-MM-DD'),
             student_view: true,
             sort_by: 'relevance',
           }),

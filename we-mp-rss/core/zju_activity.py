@@ -798,31 +798,22 @@ class ZJUActivityService:
         upcoming_only: bool = False,
     ) -> dict:
         if refresh:
-            with self._lock:
-                self._source_cache.clear()
+            from core.activity_scraper import scrape_and_persist
+            import threading
+            t = threading.Thread(target=scrape_and_persist, daemon=True)
+            t.start()
+            t.join(timeout=60)
 
         generated_at = self._utc_now_iso()
         self._last_generated_at = generated_at
-        collected = []
-        for channel in self._source_registry.iter_channels():
-            build_sources = self._source_registry.get_service_source_builder(self, channel)
-            for source in build_sources():
-                try:
-                    collected.extend(self._fetch_items_for_source(source))
-                except Exception as exc:
-                    self._update_source_status(
-                        source,
-                        ok=False,
-                        error=str(exc),
-                    )
-                    if source["source_channel"] == "wechat":
-                        print_warning(f"读取公众号活动失败: {source['id']} {source.get('mp_name')} -> {exc}")
-                        log_event("warning", "wechat activity source failed", source_id=source["id"], mp_name=source.get("mp_name"), error=exc)
-                    else:
-                        print_warning(f"抓取活动源失败: {source['id']} {source['url']} -> {exc}")
-                        log_event("warning", "website activity source failed", source_id=source["id"], source_url=source["url"], error=exc)
 
-        collected = self._dedupe_activities(collected)
+        # 从数据库读取活动
+        collected = self._load_activities_from_db()
+
+        # 如果数据库为空，回退到实时抓取（首次启动、采集尚未完成时）
+        if not collected:
+            collected = self._fetch_all_activities_live()
+
         collected, validation_summary = self._validate_activities(collected)
 
         if college_id and college_id != "all":
@@ -888,14 +879,51 @@ class ZJUActivityService:
             "source_metrics": source_metrics,
         }
 
+    def _load_activities_from_db(self) -> list[dict]:
+        """从 activities 表读取所有活动记录。"""
+        try:
+            from core.db import DB
+            from core.models.activity import Activity as ActivityModel
+            session = DB.get_session()
+            rows = session.query(ActivityModel).all()
+            return [row.to_dict() for row in rows]
+        except Exception as exc:
+            print_warning(f"从数据库读取活动失败，将回退到实时抓取: {exc}")
+            return []
+
+    def _fetch_all_activities_live(self) -> list[dict]:
+        """回退路径：实时抓取所有来源（数据库为空时使用）。"""
+        collected = []
+        for channel in self._source_registry.iter_channels():
+            build_sources = self._source_registry.get_service_source_builder(self, channel)
+            for source in build_sources():
+                try:
+                    collected.extend(self._fetch_items_for_source(source))
+                except Exception as exc:
+                    self._update_source_status(source, ok=False, error=str(exc))
+                    if source["source_channel"] == "wechat":
+                        print_warning(f"读取公众号活动失败: {source['id']} {source.get('mp_name')} -> {exc}")
+                        log_event("warning", "wechat activity source failed", source_id=source["id"], mp_name=source.get("mp_name"), error=exc)
+                    else:
+                        print_warning(f"抓取活动源失败: {source['id']} {source['url']} -> {exc}")
+                        log_event("warning", "website activity source failed", source_id=source["id"], source_url=source["url"], error=exc)
+        return self._dedupe_activities(collected)
+
     def get_activity(self, activity_id: str) -> dict | None:
+        # 优先从数据库查单条
+        try:
+            from core.db import DB
+            from core.models.activity import Activity as ActivityModel
+            session = DB.get_session()
+            row = session.query(ActivityModel).filter(ActivityModel.id == activity_id).first()
+            if row:
+                return self._decorate_activity(self._enrich_activity_detail(row.to_dict()))
+        except Exception:
+            pass
+
+        # 回退：从列表中查找
         result = self.list_activities(limit=1000)
         for item in result["list"]:
-            if item["id"] == activity_id:
-                return self._decorate_activity(self._enrich_activity_detail(item))
-
-        refreshed = self.list_activities(limit=1000, refresh=True)
-        for item in refreshed["list"]:
             if item["id"] == activity_id:
                 return self._decorate_activity(self._enrich_activity_detail(item))
 

@@ -112,17 +112,26 @@ class WechatActivityAdapter:
             except Exception:
                 publish_year = None
 
+        # 预处理 body_text：合并被换行打断的日期（如 "4\n月10日" → "4月10日"）
+        body_text_processed = re.sub(r'(\d)\n(?=月)', r'\1', body_text)
+
         speaker = self._extract_detail_text_value(
-            body_text,
+            body_text_processed,
             [r"(?:主讲人|报告人|分享人|嘉宾)\s*[:：]\s*([^\n]+)"],
         )
         activity_time = self._extract_detail_text_value(
-            body_text,
-            [r"(?:活动时间|讲座时间|时\s*间)\s*[:：]\s*([^\n]+)"],
+            body_text_processed,
+            [
+                r"(?:活动时间|讲座时间|时\s*间)\s*[:：]\s*([^\n]{2,50}?)(?=\n|$|活动地点|地点:|主讲人|嘉宾)",
+                r"(?:活动时间|讲座时间|时\s*间)\s*[:：]\s*([^\n]+)",
+            ],
         )
         location = self._extract_detail_text_value(
-            body_text,
-            [r"(?:活动地点|讲座地点|地\s*点)\s*[:：]\s*([^\n]+)"],
+            body_text_processed,
+            [
+                r"(?:活动地点|讲座地点|地\s*点)\s*[:：]\s*([^\n]{2,40}?)(?=\n|$|活动形式|形式:|主讲人|时间)",
+                r"(?:活动地点|讲座地点|地\s*点)\s*[:：]\s*([^\n]+)",
+            ],
         )
 
         activity_date = (

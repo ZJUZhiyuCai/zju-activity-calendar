@@ -260,6 +260,45 @@ async def get_queue_history(
         )
 
 from core.resource import get_system_resources
+from core.content_filler import get_filler_status, fill_one_article
+
+
+@router.get("/content_filler/status", summary="内容补全服务状态")
+async def get_content_filler_status(
+    current_user: dict = Depends(get_maintenance_user)
+) -> Dict[str, Any]:
+    """获取文章内容补全服务的状态
+
+    Returns:
+        包含以下字段:
+        - is_rate_limited: 是否处于风控暂停期
+        - last_run_at: 上次运行时间
+        - success_count: 成功次数
+        - fail_count: 失败次数
+        - rate_limited_count: 触发风控次数
+    """
+    try:
+        return success_response(data=get_filler_status())
+    except Exception as e:
+        return error_response(
+            code=50010,
+            message=f"获取内容补全状态失败: {str(e)}"
+        )
+
+
+@router.post("/content_filler/trigger", summary="手动触发内容补全")
+async def trigger_content_filler(
+    current_user: dict = Depends(get_maintenance_user)
+) -> Dict[str, Any]:
+    """手动触发一次内容补全任务"""
+    try:
+        fill_one_article()
+        return success_response(message="内容补全任务已触发")
+    except Exception as e:
+        return error_response(
+            code=50011,
+            message=f"触发内容补全失败: {str(e)}"
+        )
 @router.get("/resources", summary="获取系统资源使用情况")
 async def system_resources(
     current_user: dict = Depends(get_maintenance_user)
