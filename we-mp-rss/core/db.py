@@ -66,12 +66,44 @@ class Db:
             
             self.session_factory=self.get_session_factory()
             self.ensure_article_columns()
+            self.ensure_activity_columns()
+            self.ensure_non_activity_table()
         except Exception as e:
             print(f"Error creating database connection: {e}")
             raise
     def ensure_article_columns(self):
         """Legacy placeholder for historical article migrations."""
         return
+    def ensure_activity_columns(self):
+        """Add lightweight activity columns introduced after early SQLite deployments."""
+        try:
+            inspector = inspect(self.engine)
+            if not inspector.has_table("activities"):
+                return
+            existing = {column["name"] for column in inspector.get_columns("activities")}
+            columns = {
+                "campus": "VARCHAR(50)",
+                "bonus_type": "VARCHAR(50)",
+                "bonus_detail": "TEXT",
+                "llm_pending": "INTEGER DEFAULT 0",
+                "llm_error": "TEXT",
+                "llm_confidence": "VARCHAR(20)",
+                "record_bucket": "VARCHAR(50) DEFAULT 'activity'",
+                "non_activity_reason": "TEXT",
+            }
+            with self.engine.begin() as conn:
+                for name, ddl_type in columns.items():
+                    if name not in existing:
+                        conn.execute(text(f"ALTER TABLE activities ADD COLUMN {name} {ddl_type}"))
+        except Exception as e:
+            print_warning(f"活动表字段补齐失败，继续启动: {e}")
+    def ensure_non_activity_table(self):
+        """Create non-activity archive table for triaged records."""
+        try:
+            from core.models.non_activity_record import NonActivityRecord  # noqa: F401
+            Base.metadata.create_all(self.engine, tables=[NonActivityRecord.__table__])
+        except Exception as e:
+            print_warning(f"非活动归档表创建失败，继续启动: {e}")
     def create_tables(self):
         """Create all tables defined in models"""
         from core.models.base import Base as B # 导入所有模型

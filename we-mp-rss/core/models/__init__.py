@@ -8,5 +8,6 @@ from .user import User
 from .config_management import ConfigManagement
 # 导入活动模型
 from .activity import Activity
+from .non_activity_record import NonActivityRecord
 # 导入基础模型
 from .base import *

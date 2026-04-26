@@ -421,46 +421,76 @@
           "description": "管院讲座论坛（高频更新）"
         },
         {
-          "name": "浙江大学经济学院",
+          "name": "浙大经院青年",
           "college_id": "cec",
           "priority": 2,
-          "description": "经院讲座信息"
+          "description": "经济学院团学活动与讲座信息"
         },
         {
-          "name": "浙江大学文学院",
+          "name": "浙大文学院团委",
           "college_id": "lit",
           "priority": 2,
-          "description": "人文讲座"
+          "description": "文学院团学活动与人文讲座"
         },
         {
-          "name": "浙大计算机和软件学院高级培训",
+          "name": "ZJU微计录",
           "college_id": "cs",
           "priority": 2,
-          "description": "计算机类讲座"
+          "description": "计算机科学与技术学院活动信息"
         },
         {
-          "name": "浙江大学医学院",
+          "name": "浙江大学医学院团委",
           "college_id": "cmm",
           "priority": 2,
-          "description": "医学院讲座"
+          "description": "医学院团学活动与讲座"
         },
         {
-          "name": "浙江大学机械工程学院",
+          "name": "浙大机械青年",
           "college_id": "me",
           "priority": 3,
-          "description": "机械学院信息"
+          "description": "机械工程学院青年活动信息"
         },
         {
-          "name": "浙江大学电气工程学院",
+          "name": "EE生辉",
           "college_id": "ee",
           "priority": 3,
-          "description": "电气学院信息"
+          "description": "电气工程学院青年活动信息"
         },
         {
           "name": "浙江大学生命科学学院",
           "college_id": "cls",
           "priority": 3,
           "description": "生命学院信息"
+        },
+        {
+          "name": "公小管",
+          "college_id": "spa",
+          "priority": 3,
+          "description": "公共管理学院团学活动信息"
+        },
+        {
+          "name": "求是外院青年",
+          "college_id": "sis",
+          "priority": 3,
+          "description": "外国语学院青年活动信息"
+        },
+        {
+          "name": "信电青年",
+          "college_id": "isee",
+          "priority": 3,
+          "description": "信息与电子工程学院青年活动信息"
+        },
+        {
+          "name": "ZJU能小源",
+          "college_id": "doe",
+          "priority": 3,
+          "description": "能源工程学院青年活动信息"
+        },
+        {
+          "name": "媒大媒小",
+          "college_id": "cmic",
+          "priority": 3,
+          "description": "传媒与国际文化学院青年活动信息"
         },
         {
           "name": "浙大竺院人",

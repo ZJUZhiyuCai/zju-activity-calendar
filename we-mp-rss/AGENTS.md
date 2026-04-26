@@ -14,3 +14,5 @@ Backend test coverage is minimal and mostly lives near the code, for example `co
 
 ## Security & Configuration Tips
 Do not commit real `config.yaml`, `/.env`, tokens, cookies, or data from `data/`. Start from `config.example.yaml` and `/.env.example`, then keep secrets in local-only config. For deployment environments where WeChat blocks datacenter IPs, prefer the compose `singbox` sidecar and a single `PROXY_URL=` entry in `/.env` instead of duplicating proxy settings across files.
+
+当前项目的技术细节写在 tech.md 中

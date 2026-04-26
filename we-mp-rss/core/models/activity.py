@@ -12,6 +12,7 @@ class Activity(Base):
     activity_type = Column(String(100))
     activity_date = Column(String(20), index=True)
     activity_time = Column(String(100))
+    campus = Column(String(50))
     location = Column(String(500))
     speaker = Column(String(500))
     speaker_title = Column(String(500))
@@ -27,6 +28,13 @@ class Activity(Base):
     publish_time = Column(Integer)
     registration_required = Column(Integer, default=0)
     registration_link = Column(String(500))
+    bonus_type = Column(String(50))
+    bonus_detail = Column(Text)
+    llm_pending = Column(Integer, default=0)
+    llm_error = Column(Text)
+    llm_confidence = Column(String(20))
+    record_bucket = Column(String(50), default="activity", index=True)
+    non_activity_reason = Column(String(255))
     fetched_at = Column(Integer, index=True)  # unix timestamp
 
     def to_dict(self) -> dict:
@@ -38,6 +46,7 @@ class Activity(Base):
             "activity_type": self.activity_type,
             "activity_date": self.activity_date,
             "activity_time": self.activity_time,
+            "campus": self.campus,
             "location": self.location,
             "speaker": self.speaker,
             "speaker_title": self.speaker_title,
@@ -53,4 +62,11 @@ class Activity(Base):
             "publish_time": self.publish_time,
             "registration_required": bool(self.registration_required),
             "registration_link": self.registration_link,
+            "bonus_type": self.bonus_type,
+            "bonus_detail": self.bonus_detail,
+            "llm_pending": bool(self.llm_pending),
+            "llm_error": self.llm_error,
+            "llm_confidence": self.llm_confidence,
+            "record_bucket": self.record_bucket or "activity",
+            "non_activity_reason": self.non_activity_reason,
         }

@@ -1,0 +1,9 @@
+services:
+  calendar-frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    container_name: calendar-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:80"

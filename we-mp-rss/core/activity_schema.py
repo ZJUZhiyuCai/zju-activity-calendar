@@ -17,6 +17,7 @@ class ActivityRecord(BaseModel):
     source_url: str
     source_type: str
     source_channel: str = "website"
+    campus: Optional[str] = None
     speaker: Optional[str] = None
     speaker_title: Optional[str] = None
     speaker_intro: Optional[str] = None
@@ -27,6 +28,11 @@ class ActivityRecord(BaseModel):
     cover_image: Optional[str] = None
     registration_required: bool = False
     registration_link: Optional[str] = None
+    bonus_type: Optional[str] = None
+    bonus_detail: Optional[str] = None
+    llm_pending: bool = False
+    llm_error: Optional[str] = None
+    llm_confidence: Optional[float] = None
     raw_date_text: Optional[str] = None
     mp_name: Optional[str] = None
     publish_time: Optional[int] = None

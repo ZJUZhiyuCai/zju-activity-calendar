@@ -29,6 +29,7 @@ from core.activity_sources.common import (
     HIGH_SIGNAL_SOURCE_IDS,
     WECHAT_CORE_SOURCE_MAP,
     clean_text,
+    extract_labeled_text,
     extract_campus,
     is_evening_time,
     normalize_title_key,
@@ -596,7 +597,7 @@ class ZJUActivityService:
 
     def _decorate_activity(self, activity: dict) -> dict:
         decorated = dict(activity)
-        campus = extract_campus(activity.get("location"))
+        campus = activity.get("campus") or extract_campus(activity.get("location"))
         days_until = self._get_days_until(activity.get("activity_date"))
         has_complete_info = bool(activity.get("activity_time") and activity.get("location"))
 
@@ -660,12 +661,11 @@ class ZJUActivityService:
         return [best_by_key[key] for key in ordered_keys]
 
     def _extract_detail_text_value(self, text: str, patterns: list[str]) -> str | None:
-        for pattern in patterns:
-            match = re.search(pattern, text, flags=re.IGNORECASE)
-            if not match:
-                continue
-            return clean_text(match.group(1))
-        return None
+        return extract_labeled_text(
+            text,
+            inline_patterns=patterns,
+            labels=[],
+        )
 
     def _enrich_activity_detail(self, activity: dict) -> dict:
         source_url = activity.get("source_url")
@@ -709,23 +709,28 @@ class ZJUActivityService:
         if not description and body_text:
             description = clean_text(body_text[:280])
 
-        speaker = self._extract_detail_text_value(
-            body_text,
-            [
-                r"(?:主讲人|报告人|演讲人)\s*[:：]\s*([^\n]+)",
-            ],
+        time_label_pattern = (
+            r"(?:(?:活动时间|讲座时间)\s*(?:[:：]\s*|(?=[0-9０-９一二三四五六日天上下早中晚今明本周星期（(]))|"
+            r"时\s*间\s*(?:[:：]\s*|(?=[0-9０-９一二三四五六日天上下早中晚今明本周星期（(]))"
+            r")"
         )
-        activity_time = self._extract_detail_text_value(
+        speaker = extract_labeled_text(
             body_text,
-            [
-                r"(?:时\s*间)\s*[:：]\s*([^\n]+)",
-            ],
+            inline_patterns=[r"(?:主讲人|报告人|演讲人)\s*[:：]?\s*([^\n]+)"],
+            labels=["主讲人", "报告人", "演讲人"],
+            stop_labels=["时间", "地点", "活动时间", "活动地点", "主讲人简介"],
         )
-        location = self._extract_detail_text_value(
+        activity_time = extract_labeled_text(
             body_text,
-            [
-                r"(?:地\s*点)\s*[:：]\s*([^\n]+)",
-            ],
+            inline_patterns=[rf"{time_label_pattern}([^\n]+)"],
+            labels=["活动时间", "讲座时间", "时间"],
+            stop_labels=["地点", "活动地点", "讲座地点", "主讲人", "报告人", "演讲人", "主讲人简介"],
+        )
+        location = extract_labeled_text(
+            body_text,
+            inline_patterns=[r"(?:活动地点|讲座地点|地\s*点)\s*(?:[:：]\s*)?([^\n]+)"],
+            labels=["活动地点", "讲座地点", "地点"],
+            stop_labels=["时间", "活动时间", "讲座时间", "主讲人", "报告人", "演讲人", "主讲人简介"],
         )
 
         cover_image = None
@@ -885,7 +890,9 @@ class ZJUActivityService:
             from core.db import DB
             from core.models.activity import Activity as ActivityModel
             session = DB.get_session()
-            rows = session.query(ActivityModel).all()
+            rows = session.query(ActivityModel).filter(
+                (ActivityModel.record_bucket.is_(None)) | (ActivityModel.record_bucket != "non_activity")
+            ).all()
             return [row.to_dict() for row in rows]
         except Exception as exc:
             print_warning(f"从数据库读取活动失败，将回退到实时抓取: {exc}")
@@ -915,7 +922,10 @@ class ZJUActivityService:
             from core.db import DB
             from core.models.activity import Activity as ActivityModel
             session = DB.get_session()
-            row = session.query(ActivityModel).filter(ActivityModel.id == activity_id).first()
+            row = session.query(ActivityModel).filter(
+                ActivityModel.id == activity_id,
+                (ActivityModel.record_bucket.is_(None)) | (ActivityModel.record_bucket != "non_activity"),
+            ).first()
             if row:
                 return self._decorate_activity(self._enrich_activity_detail(row.to_dict()))
         except Exception:

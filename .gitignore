@@ -1,18 +1,65 @@
+# OS / editor
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.trae/
+*.swp
+*.swo
+*~
 
-# Root env / local state
+# Local assistant / scratch state
+.codex
+.codex/
+.claude/
+CLAUDE.md
+codex_history_repair/
+
+# Environment and secrets
 .env
-.env.local
+.env.*
+!.env.example
+!**/.env.example
+*.local
+*.lic
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+
+# Logs / runtime markers
+*.log
+logs/
+*.pid
+*.tmp
+*.bak
+*.backup
+
+# Databases and local runtime data
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+.venv/
+venv/
+env/
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
-
-CLAUDE.md
-
-# Python caches
-**/__pycache__/
-**/*.pyc
+frontend/dist-ssr/
+frontend/.vite/
 
 # Backend runtime state
 we-mp-rss/config.yaml
@@ -20,25 +67,11 @@ we-mp-rss/data/
 we-mp-rss/logs/
 we-mp-rss/.venv/
 we-mp-rss/venv/
+we-mp-rss/backend.pid
 we-mp-rss/docker_version.txt
 we-mp-rss/static/calendar/
-
-# 证书与授权文件（含私钥/token，绝不上传）
-*.lic
-*.key
-*.pem
-*.p12
-*.pfx
+we-mp-rss/static/cache/
+we-mp-rss/static/wx_qrcode.png
 
 # Local sidecar repo not included in the first public release scope
 wexin-read-mcp/
-
-# Editor
-.idea/
-.vscode/
-.trae/
-
-# Claude Code 工作目录
-.claude/
-
-*.log

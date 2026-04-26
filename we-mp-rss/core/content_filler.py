@@ -22,11 +22,12 @@ import requests
 from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, text
 
+from core.config import cfg
 from core.print import print_error, print_info, print_warning
 
 # 状态文件路径
 STATE_FILE = Path("data/content_filler_state.json")
-DB_URL = "sqlite:///data/db.db"
+DB_URL = cfg.get("db", "sqlite:///data/db.db")
 
 # 风控配置
 RATE_LIMIT_PAUSE_MINUTES = 30  # 触发风控后暂停30分钟

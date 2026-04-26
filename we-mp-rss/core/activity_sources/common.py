@@ -120,6 +120,71 @@ def clean_text(value: str | None) -> str:
     return re.sub(r"\s+", " ", value).replace("\xa0", " ").strip()
 
 
+def _label_line_pattern(label: str) -> str:
+    return r"\s*".join(re.escape(char) for char in label if char.strip())
+
+
+def _extract_inline_labeled_value(line: str, labels: list[str]) -> str | None:
+    for label in labels:
+        pattern = _label_line_pattern(label)
+        normalized_label = "".join(char for char in label if char.strip())
+        delimiter = r"(?:[:：]\s*)?"
+        if normalized_label.endswith("时间"):
+            delimiter = r"(?:(?:[:：]\s*)|(?=[0-9０-９一二三四五六日天上下早中晚今明本周星期（(]))"
+        match = re.match(
+            rf"^\s*{pattern}\s*{delimiter}(?P<value>.+?)\s*$",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            value = clean_text(match.group("value"))
+            if value:
+                return value
+    return None
+
+
+def _is_label_only_line(line: str, labels: list[str]) -> bool:
+    for label in labels:
+        pattern = _label_line_pattern(label)
+        if re.match(rf"^\s*{pattern}\s*[:：]?\s*$", line, flags=re.IGNORECASE):
+            return True
+    return False
+
+
+def extract_labeled_text(
+    text_value: str | None,
+    *,
+    inline_patterns: list[str],
+    labels: list[str],
+    stop_labels: list[str] | None = None,
+) -> str | None:
+    text = text_value or ""
+    for pattern in inline_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            value = clean_text(match.group(1))
+            if value:
+                return value
+
+    lines = [clean_text(line) for line in text.replace("\r", "\n").splitlines() if clean_text(line)]
+    stop_candidates = list(dict.fromkeys((stop_labels or []) + labels))
+
+    for index, line in enumerate(lines):
+        inline_value = _extract_inline_labeled_value(line, labels)
+        if inline_value:
+            return inline_value
+        if not _is_label_only_line(line, labels):
+            continue
+
+        for next_line in lines[index + 1 :]:
+            if _is_label_only_line(next_line, stop_candidates):
+                break
+            next_value = clean_text(next_line)
+            if next_value:
+                return next_value
+    return None
+
+
 def to_iso_date(value: str | None) -> str | None:
     text = clean_text(value)
     if not text:

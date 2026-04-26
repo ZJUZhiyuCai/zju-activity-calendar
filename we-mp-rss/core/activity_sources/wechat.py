@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import re
+import os
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
 from sqlalchemy import bindparam, text
+
+from core.activity_llm import is_activity_llm_enabled, parse_activity_with_llm
+from core.non_activity_classifier import classify_record_bucket
+from core.print import print_info
 
 from .common import (
     DELETED_STATUS,
@@ -12,6 +17,7 @@ from .common import (
     build_activity_id,
     clean_text,
     dedupe_exact_items,
+    extract_labeled_text,
     to_iso_date_with_default_year,
 )
 
@@ -69,12 +75,74 @@ class WechatActivityAdapter:
         return "讲座"
 
     def _extract_detail_text_value(self, text_value: str, patterns: list[str]) -> str | None:
-        for pattern in patterns:
-            match = re.search(pattern, text_value, flags=re.IGNORECASE)
-            if not match:
-                continue
-            return clean_text(match.group(1))
-        return None
+        return extract_labeled_text(
+            text_value,
+            inline_patterns=patterns,
+            labels=[],
+        )
+
+    def extract_article_metadata(self, article: dict) -> dict:
+        body_text = self._article_body_text(article)
+
+        publish_year = None
+        publish_time = article.get("publish_time")
+        if isinstance(publish_time, int):
+            try:
+                publish_year = datetime.fromtimestamp(publish_time).year
+            except Exception:
+                publish_year = None
+
+        # 预处理 body_text：合并被换行打断的日期（如 "4\n月10日" → "4月10日"）
+        body_text_processed = re.sub(r"(\d)\n(?=月)", r"\1", body_text)
+        time_label_pattern = (
+            r"(?:(?:活动时间|讲座时间)\s*(?:[:：]\s*|(?=[0-9０-９一二三四五六日天上下早中晚今明本周星期（(]))|"
+            r"时\s*间\s*(?:[:：]\s*|(?=[0-9０-９一二三四五六日天上下早中晚今明本周星期（(]))"
+            r")"
+        )
+
+        speaker = extract_labeled_text(
+            body_text_processed,
+            inline_patterns=[r"(?:主讲人|报告人|分享人|嘉宾)\s*[:：]?\s*([^\n]+)"],
+            labels=["主讲人", "报告人", "分享人", "嘉宾"],
+            stop_labels=["活动时间", "讲座时间", "时间", "活动地点", "讲座地点", "地点", "主讲人简介"],
+        )
+        activity_time = extract_labeled_text(
+            body_text_processed,
+            inline_patterns=[
+                rf"{time_label_pattern}([^\n]{{2,50}}?)(?=\n|$|活动地点|讲座地点|地\s*点|活动形式|形式|主讲人|报告人|分享人|嘉宾|主讲人简介)",
+                rf"{time_label_pattern}([^\n]+)",
+            ],
+            labels=["活动时间", "讲座时间", "时间"],
+            stop_labels=["活动地点", "讲座地点", "地点", "活动形式", "形式", "主讲人", "报告人", "分享人", "嘉宾", "主讲人简介"],
+        )
+        location = extract_labeled_text(
+            body_text_processed,
+            inline_patterns=[
+                r"(?:活动地点|讲座地点|地\s*点)\s*(?:[:：]\s*)?([^\n]{2,40}?)(?=\n|$|活动形式|形式|主讲人|报告人|分享人|嘉宾|时\s*间|主讲人简介)",
+                r"(?:活动地点|讲座地点|地\s*点)\s*(?:[:：]\s*)?([^\n]+)",
+            ],
+            labels=["活动地点", "讲座地点", "地点"],
+            stop_labels=["活动形式", "形式", "主讲人", "报告人", "分享人", "嘉宾", "时间", "活动时间", "讲座时间", "主讲人简介"],
+        )
+
+        activity_date = (
+            to_iso_date_with_default_year(activity_time, publish_year)
+            or to_iso_date_with_default_year(clean_text(article.get("title")), publish_year)
+            or to_iso_date_with_default_year(clean_text(article.get("description")), publish_year)
+            or to_iso_date_with_default_year(body_text[:1200], publish_year)
+        )
+
+        return {
+            "body_text": body_text,
+            "body_text_processed": body_text_processed,
+            "publish_year": publish_year,
+            "speaker": speaker,
+            "activity_time": activity_time,
+            "location": location,
+            "activity_date": activity_date,
+            "registration_link": self._extract_registration_link_from_article(article),
+            "summary": clean_text(article.get("description")) or clean_text(body_text[:280]) or clean_text(article.get("title")),
+        }
 
     def _is_activity_candidate(self, service, title: str, description: str, body_text: str) -> bool:
         config = service._load_config()
@@ -96,69 +164,99 @@ class WechatActivityAdapter:
             return False
         return has_include
 
-    def _article_to_activity(self, service, source: dict, article: dict) -> dict | None:
-        body_text = self._article_body_text(article)
+    def _article_to_activity(self, service, source: dict, article: dict, *, use_llm: bool = True) -> dict | None:
         description = clean_text(article.get("description"))
         title = clean_text(article.get("title"))
+        extracted = self.extract_article_metadata(article)
+        body_text = extracted["body_text"]
 
         if not self._is_activity_candidate(service, title, description, body_text):
             return None
 
-        publish_year = None
         publish_time = article.get("publish_time")
-        if isinstance(publish_time, int):
-            try:
-                publish_year = datetime.fromtimestamp(publish_time).year
-            except Exception:
-                publish_year = None
+        publish_year = extracted["publish_year"]
+        body_text_processed = extracted["body_text_processed"]
+        speaker = extracted["speaker"]
+        activity_time = extracted["activity_time"]
+        location = extracted["location"]
+        activity_date = extracted["activity_date"]
+        registration_link = extracted["registration_link"]
+        summary = extracted["summary"]
+        llm_extra = {}
 
-        # 预处理 body_text：合并被换行打断的日期（如 "4\n月10日" → "4月10日"）
-        body_text_processed = re.sub(r'(\d)\n(?=月)', r'\1', body_text)
+        if use_llm and is_activity_llm_enabled():
+            print_info(f"LLM 解析公众号文章: {title[:40]}")
+            outcome = parse_activity_with_llm(
+                title=title,
+                description=description,
+                body_text=body_text_processed,
+                publish_year=publish_year,
+            )
+            if outcome.result:
+                parsed = outcome.result
+                if not parsed.is_activity:
+                    return None
+                activity_date = parsed.activity_date or activity_date
+                activity_time = parsed.activity_time or activity_time
+                speaker = parsed.speaker or speaker
+                location = parsed.location or location
+                summary = parsed.summary or summary
+                llm_extra = {
+                    "speaker_title": parsed.speaker_title,
+                    "speaker_intro": parsed.speaker_intro,
+                    "activity_type": parsed.activity_type,
+                    "organizer": parsed.organizer,
+                    "campus": parsed.campus,
+                    "bonus_type": parsed.bonus_type,
+                    "bonus_detail": parsed.bonus_detail,
+                    "llm_confidence": parsed.confidence,
+                    "llm_pending": parsed.needs_review,
+                    "llm_error": None,
+                }
+                print_info(
+                    "LLM 解析完成: "
+                    f"is_activity={parsed.is_activity} "
+                    f"date={parsed.activity_date} "
+                    f"confidence={parsed.confidence}"
+                )
+            elif outcome.pending:
+                llm_extra = {
+                    "llm_pending": True,
+                    "llm_error": outcome.error,
+                }
 
-        speaker = self._extract_detail_text_value(
-            body_text_processed,
-            [r"(?:主讲人|报告人|分享人|嘉宾)\s*[:：]\s*([^\n]+)"],
-        )
-        activity_time = self._extract_detail_text_value(
-            body_text_processed,
-            [
-                r"(?:活动时间|讲座时间|时\s*间)\s*[:：]\s*([^\n]{2,50}?)(?=\n|$|活动地点|地点:|主讲人|嘉宾)",
-                r"(?:活动时间|讲座时间|时\s*间)\s*[:：]\s*([^\n]+)",
-            ],
-        )
-        location = self._extract_detail_text_value(
-            body_text_processed,
-            [
-                r"(?:活动地点|讲座地点|地\s*点)\s*[:：]\s*([^\n]{2,40}?)(?=\n|$|活动形式|形式:|主讲人|时间)",
-                r"(?:活动地点|讲座地点|地\s*点)\s*[:：]\s*([^\n]+)",
-            ],
-        )
-
-        activity_date = (
-            to_iso_date_with_default_year(activity_time, publish_year)
-            or to_iso_date_with_default_year(title, publish_year)
-            or to_iso_date_with_default_year(description, publish_year)
-            or to_iso_date_with_default_year(body_text[:1200], publish_year)
-        )
         if not activity_date:
+            if llm_extra.get("llm_pending"):
+                return None
             return None
 
-        registration_link = self._extract_registration_link_from_article(article)
-        summary = description or clean_text(body_text[:280]) or title
+        organizer = llm_extra.get("organizer") or source["name"]
+        activity_type = llm_extra.get("activity_type") or self._guess_activity_type(title)
+        speaker_title = llm_extra.get("speaker_title")
+        speaker_intro = llm_extra.get("speaker_intro")
+        record_bucket, non_activity_reason = classify_record_bucket(
+            title=title,
+            description=description,
+            body_text=body_text_processed,
+            activity_time=activity_time,
+            location=location,
+            activity_date=activity_date,
+            publish_time=publish_time,
+        )
 
         return {
             "id": build_activity_id(source["cache_key"], article.get("url") or article.get("id"), title),
             "title": title,
             "college_id": source["id"],
             "college_name": source["name"],
-            "activity_type": self._guess_activity_type(title),
+            "activity_type": activity_type,
             "speaker": speaker,
-            "speaker_title": None,
-            "speaker_intro": None,
+            "speaker_title": speaker_title,
+            "speaker_intro": speaker_intro,
             "activity_date": activity_date,
             "activity_time": activity_time,
             "location": location,
-            "organizer": source["name"],
+            "organizer": organizer,
             "description": summary,
             "cover_image": article.get("pic_url") or None,
             "source_url": article.get("url"),
@@ -169,10 +267,16 @@ class WechatActivityAdapter:
             "mp_name": source.get("mp_name"),
             "raw_date_text": activity_time or description,
             "publish_time": publish_time,
+            "record_bucket": record_bucket,
+            "non_activity_reason": non_activity_reason,
+            **llm_extra,
         }
 
     def fetch(self, service, source: dict) -> list[dict]:
         cache_key = source.get("cache_key") or source["id"]
+        llm_enabled = is_activity_llm_enabled()
+        llm_max_per_source = int(os.getenv("ACTIVITY_LLM_MAX_ARTICLES_PER_SOURCE", "2"))
+        llm_attempted = 0
 
         with service._lock:
             cached = service._source_cache.get(cache_key)
@@ -229,7 +333,10 @@ class WechatActivityAdapter:
 
                 items = []
                 for article in articles:
-                    activity = self._article_to_activity(service, source, article)
+                    use_llm = llm_enabled and llm_attempted < llm_max_per_source
+                    if use_llm:
+                        llm_attempted += 1
+                    activity = self._article_to_activity(service, source, article, use_llm=use_llm)
                     if activity:
                         items.append(activity)
 
